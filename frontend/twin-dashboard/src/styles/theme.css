@@ -1,0 +1,46 @@
+/* ===== GLOBAL THEME ===== */
+
+:root {
+  --bg-main: #0a0a0a;
+  --panel-bg: rgba(20, 20, 20, 0.6);
+  --panel-border: rgba(255, 255, 255, 0.05);
+
+  --text-primary: #ffffff;
+  --text-secondary: #aaaaaa;
+
+  --accent-green: #00ff9c;
+  --accent-yellow: #ffaa00;
+  --accent-red: #ff3b3b;
+
+  --glass-blur: blur(12px);
+}
+
+/* ===== GLASS PANEL ===== */
+.glass {
+  background: var(--panel-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+}
+
+/* ===== BUTTON ===== */
+.btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ===== TITLE ===== */
+.title {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
