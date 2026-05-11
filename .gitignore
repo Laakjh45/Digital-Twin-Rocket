@@ -1,0 +1,103 @@
+# LOGS
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# NODE / FRONTEND
+node_modules/
+
+dist/
+dist-ssr/
+build/
+coverage/
+
+.cache/
+.temp/
+.tmp/
+.eslintcache
+.pnpm-store/
+
+# PYTHON / BACKEND
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python packaging
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ENVIRONMENT FILES
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.local
+
+# EDITORS / IDE
+.vscode/*
+!.vscode/extensions.json
+
+.idea/
+
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OPERATING SYSTEM FILES
+.DS_Store
+Thumbs.db
+
+# DOCKER / CONTAINERS
+docker-data/
+volumes/
+
+# Docker overrides
+docker-compose.override.yml
+
+# INFLUXDB DATA
+influxdb-data/
+influxdb/data/
+influxdb/wal/
+influxdb/meta/
+
+# REDIS DATA
+redis-data/
+dump.rdb
+appendonly.aof
+
+# RUNTIME FILES
+*.pid
+*.seed
+*.pid.lock
+
+# Generated telemetry dumps
+telemetry/
+exports/
+
+# CSV sensor exports
+*.csv
+
+# Temporary simulation outputs
+sim-output/
