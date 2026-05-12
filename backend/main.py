@@ -17,6 +17,7 @@ client = InfluxDBClient(
 )
 
 bucket = INFLUXDB_BUCKET
+MEASUREMENT = "rocket_sensors"
 
 # ===== APP INIT =====
 app = FastAPI()
@@ -37,28 +38,30 @@ query_api: QueryApi = client.query_api()
 def root():
     return {"message": "Digital Twin Backend Running"}
 
-@app.get("/sensors")
-def get_sensors():
+@app.get("/twins/{twin_id}/sensors")
+def get_sensors(twin_id: str):
     query = f'''
-    import "influxdata/influxdb/schema"
-    schema.tagValues(
-        bucket: "{bucket}",
-        tag: "sensor_id"
-    )
+    from(bucket: "{bucket}")
+        |> range(start: -30d)
+        |> filter(fn: (r) => r._measurement == "{MEASUREMENT}")
+        |> filter(fn: (r) => r.twin_id == "{twin_id}")
+        |> keep(columns: ["sensor_id"])
+        |> distinct(column: "sensor_id")
     '''
     tables = query_api.query(query)
     sensors = []
     for table in tables:
         for record in table.records:
-            sensors.append(record.get_value())
+            sensors.append(record["sensor_id"])
     return {"sensors": sensors}
 
-@app.get("/sensor/{sensor_id}/history")
-def get_history(sensor_id: str, minutes: int = 10):
+@app.get("/twins/{twin_id}/sensor/{sensor_id}/history")
+def get_history(twin_id: str, sensor_id: str, minutes: int = 10):
     query = f'''
     from(bucket: "{bucket}")
         |> range(start: -{minutes}m)
-        |> filter(fn: (r) => r._measurement == "rocket_sensors")
+        |> filter(fn: (r) => r._measurement == "{MEASUREMENT}")
+        |> filter(fn: (r) => r.twin_id == "{twin_id}")
         |> filter(fn: (r) => r.sensor_id == "{sensor_id}")
         |> sort(columns: ["_time"])
     '''
@@ -76,12 +79,13 @@ def get_history(sensor_id: str, minutes: int = 10):
 
     return {"sensor_id": sensor_id, "data": results}
 
-@app.get("/sensor/{sensor_id}/latest")
-def get_latest(sensor_id: str):
+@app.get("/twins/{twin_id}/sensor/{sensor_id}/latest")
+def get_latest(twin_id: str, sensor_id: str):
     query = f'''
     from(bucket: "{bucket}")
         |> range(start: -5m)
-        |> filter(fn: (r) => r._measurement == "rocket_sensors")
+        |> filter(fn: (r) => r._measurement == "{MEASUREMENT}")
+        |> filter(fn: (r) => r.twin_id == "{twin_id}")
         |> filter(fn: (r) => r.sensor_id == "{sensor_id}")
         |> last()
     '''
@@ -98,12 +102,13 @@ def get_latest(sensor_id: str):
 
     return {"sensor_id": sensor_id, "data": results}
 
-@app.get("/sensors/latest-all")
-def get_all_latest():
+@app.get("/twins/{twin_id}/sensors/latest-all")
+def get_all_latest(twin_id: str):
     query = f'''
     from(bucket: "{bucket}")
         |> range(start: -1m)
-        |> filter(fn: (r) => r._measurement == "rocket_sensors")
+        |> filter(fn: (r) => r._measurement == "{MEASUREMENT}")
+        |> filter(fn: (r) => r.twin_id == "{twin_id}")
         |> group(columns: ["sensor_id", "_field"])
         |> last()
     '''
@@ -141,17 +146,16 @@ def redis_listener(ws, twin_id, loop):
                     ws.send_json(data),
                     loop
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        print ("Redis listener error: ", e)
     finally:
         pubsub.close()
 
 
-@app.websocket("/ws/live")
-async def websocket_live(ws: WebSocket):
+@app.websocket("/ws/{twin_id}")
+async def websocket_live(ws: WebSocket, twin_id: str):
     await ws.accept()
     loop = asyncio.get_running_loop()
-    twin_id = "rocket_1"  # later we will make this dynamic
     threading.Thread(
         target=redis_listener,
         args=(ws, twin_id, loop),
@@ -172,7 +176,8 @@ async def websocket_live(ws: WebSocket):
                 query = f'''
                 from(bucket: "{bucket}")
                     |> range(start: -5s)
-                    |> filter(fn: (r) => r._measurement == "rocket_sensors")
+                    |> filter(fn: (r) => r._measurement == "{MEASUREMENT}")
+                    |> filter(fn: (r) => r.twin_id == "{twin_id}")
                     |> group(columns: ["sensor_id", "_field"])
                     |> last()
                 '''
@@ -212,10 +217,10 @@ async def websocket_live(ws: WebSocket):
             await asyncio.sleep(1)
 
     except WebSocketDisconnect:
-        print("Client disconnected")
+        print(f"Client disconnected from twin {twin_id}")
         
 
-@app.get("/events/history")
+@app.get("/twins/{twin_id}/events/history")
 def get_events(twin_id: str, minutes: int = 60):
     query = f'''
     from(bucket: "{bucket}")
