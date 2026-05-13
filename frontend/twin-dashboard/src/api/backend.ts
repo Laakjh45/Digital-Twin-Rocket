@@ -4,24 +4,24 @@ const API = axios.create({
   baseURL: "http://localhost:8000",
 });
 
-export const getSensors = async () => {
-  const response = await API.get("/sensors");
+export const getSensors = async (twinId: string) => {
+  const response = await API.get(`/twins/${twinId}/sensors`);
   return response.data.sensors;
 };
 
-export const getLatest = async (sensorId: string) => {
-  const response = await API.get(`/sensor/${sensorId}/latest`);
+export const getLatest = async (twinId: string, sensorId: string) => {
+  const response = await API.get(`/twins/${twinId}/sensor/${sensorId}/latest`);
   return response.data;
 };
 
-export const getHistory = async (sensorId: string, minutes = 5) => {
+export const getHistory = async (twinId: string, sensorId: string, minutes = 5) => {
   const response = await API.get(
-    `/sensor/${sensorId}/history?minutes=${minutes}`
+    `/twins/${twinId}/sensor/${sensorId}/history?minutes=${minutes}`
   );
   return response.data;
 };
 
-export const getAllLatest = async () => {
-  const response = await API.get("/sensors/latest-all");
+export const getAllLatest = async (twinId: string) => {
+  const response = await API.get(`/twins/${twinId}/sensors/latest-all`);
   return response.data;
 };

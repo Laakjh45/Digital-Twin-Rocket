@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import LoaderPage from "../pages/LoaderPage";
-import RocketDashboard from "../dashboards/RocketDashboard";
+import UniversalTwinDashboard from "../dashboards/UniversalTwinDashboard";
 import TwinSelectionPage from "../pages/TwinSelectionPage";
 import TransitionWrapper from "./TransitionWrapper";
 import TransitionOverlay from "./TransitionOverlay";
@@ -45,7 +45,7 @@ export default function AppRouter() {
 
     if (selectedTwin) {
       content = (
-        <RocketDashboard
+        <UniversalTwinDashboard
           twin={selectedTwin}
         />
       );

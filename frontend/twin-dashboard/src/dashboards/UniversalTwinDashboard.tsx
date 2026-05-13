@@ -11,7 +11,8 @@ type Props = {
   twin: TwinDefinition;
 };
 
-function RocketDashboard({twin}: Props) {
+function UniversalTwinDashboard({twin}: Props) {
+  const twinId = twin.id;
   const [selectedSensor, setSelectedSensor] = useState<string | null>(null);
   const [latestData, setLatestData] = useState<any[]>([]);
   const [historyData, setHistoryData] = useState<any[]>([]);
@@ -46,7 +47,6 @@ function RocketDashboard({twin}: Props) {
   const handleZoomIn = () => {sceneRef.current?.zoomIn();};
   const handleZoomOut = () => {sceneRef.current?.zoomOut();};
   const handleResetView = () => {sceneRef.current?.resetView();};
-  const [sensorData, setSensorData] = useState({});
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const handleFocus = (sensor: string) => {
@@ -163,7 +163,7 @@ function RocketDashboard({twin}: Props) {
   }, [historyBuffer.length]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("historyBuffer");
+    const saved = localStorage.getItem(`historyBuffer_${twinId}`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -177,12 +177,12 @@ function RocketDashboard({twin}: Props) {
       }
     }
     setIsHydrated(true);
-  }, []);
+  }, [twinId]);
 
   useEffect(() => {
     if (!isHydrated) return;
-    localStorage.setItem("historyBuffer", JSON.stringify(historyBuffer));
-  }, [historyBuffer, isHydrated]);
+    localStorage.setItem(`historyBuffer_${twinId}`, JSON.stringify(historyBuffer));
+  }, [historyBuffer, isHydrated, twinId]);
 
   const stepBack = () => {
     if (viewMode === "playback") {
@@ -234,13 +234,13 @@ function RocketDashboard({twin}: Props) {
     if (!isHydrated) return;
     const fetch = async () => {
       try {
-        const data = await getAllLatest();
+        const data = await getAllLatest(twinId);
         setConnectionStatus("connected");
         setAllSensorData(data);
         setHistoryBuffer((prev) => {
           let base = prev;
           if (prev.length === 0) {
-            const saved = localStorage.getItem("historyBuffer");
+            const saved = localStorage.getItem(`historyBuffer_${twinId}`);
             if (saved) {
               try {
                 const parsed = JSON.parse(saved);
@@ -268,7 +268,7 @@ function RocketDashboard({twin}: Props) {
     fetch();
     const i = setInterval(fetch, 1000);
     return () => clearInterval(i);
-  }, [isHydrated]);
+  }, [twinId, isHydrated]);
 
   useEffect(() => {
     if (!selectedSensor) {
@@ -278,7 +278,7 @@ function RocketDashboard({twin}: Props) {
 
   useEffect(() => {
     if (!selectedSensor) return;
-    getHistory(selectedSensor, 5).then((res) => {
+    getHistory(twinId, selectedSensor, 5).then((res) => {
       const grouped: any = {};
       res.data.forEach((item: any) => {
         if (!grouped[item.field]) grouped[item.field] = [];
@@ -293,7 +293,7 @@ function RocketDashboard({twin}: Props) {
       }));
       setHistoryData(traces);
     });
-  }, [selectedSensor]);
+  }, [twinId, selectedSensor]);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -302,19 +302,19 @@ function RocketDashboard({twin}: Props) {
 
     const connect = () => {
       setConnectionStatus("connecting");
-      ws = new WebSocket("ws://localhost:8000/ws/live");
+      ws = new WebSocket(`ws://localhost:8000/ws/${twinId}`);
 
       ws.onopen = () => {
         setConnectionStatus("connected");
         retryDelay = 1000;
-        getAllLatest().then((data) => {
+        getAllLatest(twinId).then((data) => {
           setAllSensorData(data);
         });
       };
 
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
-        if (msg.type === "data") setSensorData(msg.payload);
+        if (msg.type === "data") setAllSensorData(msg.payload);
         if (msg.type === "alert") setAlerts((prev) => [msg, ...prev].slice(0, 50));
         if (msg.type === "notification") setNotifications((prev) => [msg, ...prev].slice(0, 50));
       };
@@ -334,16 +334,16 @@ function RocketDashboard({twin}: Props) {
       ws?.close();
       clearTimeout(retryTimeout);
     };
-  }, []);
+  }, [twinId]);
 
   useEffect(() => {
     if (!selectedSensor) return;
     const fetch = () =>
-      getLatest(selectedSensor).then((res) => setLatestData(res.data));
+      getLatest(twinId, selectedSensor).then((res) => setLatestData(res.data));
     fetch();
     const i = setInterval(fetch, 2000);
     return () => clearInterval(i);
-  }, [selectedSensor]);
+  }, [twinId, selectedSensor]);
 
   let displayData = allSensorData;
   if (viewMode === "paused") {
@@ -370,6 +370,7 @@ function RocketDashboard({twin}: Props) {
 
         <div style={styles.center}>
           <RocketScene
+            twin={twin}
             mode={mode}
             onSensorClick={handleSensorClick}
             selectedSensor={selectedSensor}
@@ -393,7 +394,7 @@ function RocketDashboard({twin}: Props) {
   );
 }
 
-export default RocketDashboard;
+export default UniversalTwinDashboard;
 
 const styles: any = {
   container: {

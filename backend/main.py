@@ -126,7 +126,11 @@ def get_all_latest(twin_id: str):
             if sensor not in result:
                 result[sensor] = {}
 
-            result[sensor][field] = value
+            timestamp = record.get_time()
+            result[sensor][field] = {
+                "value": value,
+                "time": timestamp.timestamp()
+            }
 
     return result
 
