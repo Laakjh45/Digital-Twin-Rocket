@@ -8,8 +8,8 @@ import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from "lucide-react";
 import type { CSSProperties } from "react";
 
 // ROCKET MODEL COMPONENT
-const RocketModel = forwardRef(({onSensorClick, selectedSensor, latestData, allSensorData, mode}: any, ref) => {
-  const gltf = useGLTF("/models/PSLV_DigitalTwin_v2.glb");
+const TwinModel = forwardRef(({twin, onSensorClick, selectedSensor, latestData, allSensorData, mode}: any, ref) => {
+  const gltf = useGLTF(twin.modelPath as string);
   const pulseRef = useRef(0);
   const shockwaves = useRef<any[]>([]);
   const glowMeshes = useRef<any[]>([]);
@@ -432,7 +432,7 @@ const RocketModel = forwardRef(({onSensorClick, selectedSensor, latestData, allS
 });
 
 //  MAIN SCENE
-const RocketScene = forwardRef(({onSensorClick, selectedSensor, latestData, allSensorData, mode, isFocusMode, setIsFocusMode, setIsResetActive}: any, ref:any) => {
+const UniversalTwinScene = forwardRef(({twin, onSensorClick, selectedSensor, latestData, allSensorData, mode, isFocusMode, setIsFocusMode, setIsResetActive}: any, ref:any) => {
   const controlsRef = useRef<any>(null);
   const modelRef = useRef<any>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -468,7 +468,13 @@ const RocketScene = forwardRef(({onSensorClick, selectedSensor, latestData, allS
         box.getCenter(center);
         const controls = controlsRef.current;
         const cam = controls.object;
-        const offset = new THREE.Vector3(5, 3, 20);
+        const camOffset = twin.camera?.offset || [5, 3, 20];
+        const offset = new THREE.Vector3(
+          camOffset[0],
+          camOffset[1],
+          camOffset[2]
+        );
+
         cam.position.copy(center.clone().add(offset));
         controls.target.copy(center);
         controls.update();
@@ -481,7 +487,13 @@ const RocketScene = forwardRef(({onSensorClick, selectedSensor, latestData, allS
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
-    const initialOffset = new THREE.Vector3(5, 3, 20);
+    const camOffset = twin.camera?.offset || [5, 3, 20];
+    const initialOffset = new THREE.Vector3(
+      camOffset[0],
+      camOffset[1],
+      camOffset[2]
+    );
+
     const check = () => {
       const cam = controls.object;
       const box = new THREE.Box3().setFromObject(modelRef.current);
@@ -524,7 +536,16 @@ const RocketScene = forwardRef(({onSensorClick, selectedSensor, latestData, allS
       const box = new THREE.Box3().setFromObject(modelRef.current);
       const center = new THREE.Vector3();
       box.getCenter(center);
-      cam.position.copy(center.clone().add(new THREE.Vector3(5, 3, 20)));
+      const camOffset = twin.camera?.offset || [5, 3, 20];
+      cam.position.copy(
+        center.clone().add(
+          new THREE.Vector3(
+            camOffset[0],
+            camOffset[1],
+            camOffset[2]
+          )
+        )
+      );
       controls.target.copy(center);
       controls.update();
       setIsFocusMode(false);
@@ -659,13 +680,19 @@ const RocketScene = forwardRef(({onSensorClick, selectedSensor, latestData, allS
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <Canvas camera={{ position: [5, 5, 10], fov: 50 }}>
+      <Canvas
+        camera={{
+          position: twin.camera?.position || [5, 5, 10],
+          fov: twin.camera?.fov || 50,
+        }}
+      >
         {/* LIGHTING */}
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 10, 10]} intensity={1} />
         {/* MODEL */}
         <Suspense fallback={null}>
-          <RocketModel
+          <TwinModel
+            twin={twin}
             onSensorClick={onSensorClick}
             selectedSensor={selectedSensor}
             latestData={latestData}
@@ -752,7 +779,7 @@ const RocketScene = forwardRef(({onSensorClick, selectedSensor, latestData, allS
     </div>
   );
 });
-export default RocketScene;
+export default UniversalTwinScene;
 
 
 const moveStyles: {container: CSSProperties; btn: CSSProperties; btnHover: CSSProperties;} = {

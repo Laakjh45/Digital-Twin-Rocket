@@ -6,8 +6,12 @@ export type TwinDefinition = {
   name: string;
   description: string;
   measurement: string;
-  twinKey: string;
   modelPath: string;
+  camera?: {
+    position?: [number, number, number];
+    offset?: [number, number, number];
+    fov?: number;
+  };
   previewComponent: any;
   sensorConfig?: string;
   theme: {
@@ -24,8 +28,12 @@ export const twins: TwinDefinition[] = [
     name: "PSLV Twin",
     description: "Propulsion • Thermal • Structural telemetry",
     measurement: "rocket_sensors",
-    twinKey: "rocket_1",
     modelPath: "/models/PSLV_DigitalTwin_v2.glb",
+    camera: {
+      position: [5, 5, 10],
+      offset: [5, 3, 20],
+      fov: 50,
+    },
     previewComponent: RocketPreview,
     sensorConfig: "/configs/pslvSensors.ts",
     theme: {
@@ -42,8 +50,12 @@ export const twins: TwinDefinition[] = [
     name: "GSLV Twin",
     description: "Cryogenic propulsion monitoring",
     measurement: "gslv_sensors",
-    twinKey: "gslv_1",
     modelPath: "/models/PSLV_DigitalTwin_v2.glb",
+    camera: {
+      position: [5, 5, 10],
+      offset: [5, 3, 20],
+      fov: 50,
+    },
     previewComponent: RocketPreview,
     theme: {
       primary: "#8b5cf6",
@@ -57,8 +69,12 @@ export const twins: TwinDefinition[] = [
     name: "RLV Twin",
     description: "Reusable launch vehicle telemetry",
     measurement: "rlv_sensors",
-    twinKey: "rlv_1",
     modelPath: "/models/PSLV_DigitalTwin_v2.glb",
+    camera: {
+      position: [5, 5, 10],
+      offset: [5, 3, 20],
+      fov: 50,
+    },
     previewComponent: RocketPreview,
     theme: {
       primary: "#0ea5e9",
@@ -72,7 +88,6 @@ export const twins: TwinDefinition[] = [
 //     name: "Satellite Twin",
 //     description: "Orbital systems & thermal analytics",
 //     measurement: "satellite_sensors",
-//     twinKey: "satellite_1",
 //     modelPath: "/models/satellite.glb",
 //     previewComponent: RocketPreview,
 //     theme: {
@@ -87,7 +102,6 @@ export const twins: TwinDefinition[] = [
 //     name: "Aircraft Twin",
 //     description: "Flight systems & structural health",
 //     measurement: "aircraft_sensors",
-//     twinKey: "aircraft_1",
 //     modelPath: "/models/aircraft.glb",
 //     previewComponent: RocketPreview,
 //     theme: {
@@ -102,7 +116,6 @@ export const twins: TwinDefinition[] = [
 //     name: "Engine Twin",
 //     description: "Combustion & vibration analysis",
 //     measurement: "engine_sensors",
-//     twinKey: "engine_1",
 //     modelPath: "/models/engine.glb",
 //     previewComponent: RocketPreview,
 //     theme: {
@@ -117,7 +130,6 @@ export const twins: TwinDefinition[] = [
 //     name: "Factory Twin",
 //     description: "Industrial process monitoring",
 //     measurement: "factory_sensors",
-//     twinKey: "factory_1",
 //     modelPath: "/models/factory.glb",
 //     previewComponent: RocketPreview,
 //     theme: {

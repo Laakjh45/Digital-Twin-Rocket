@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { getLatest, getHistory, getAllLatest } from "../api/backend";
-import RocketScene from "../components/RocketScene/RocketScene";
+import UniversalTwinScene from "../components/Scene/UniversalTwinScene";
 import TopControls from "../components/layout/TopControls";
 import LeftPanel from "../components/layout/LeftPanel";
 import RightPanel from "../components/layout/RightPanel";
@@ -369,7 +369,7 @@ function UniversalTwinDashboard({twin}: Props) {
         <LeftPanel allSensorData={displayData} />
 
         <div style={styles.center}>
-          <RocketScene
+          <UniversalTwinScene
             twin={twin}
             mode={mode}
             onSensorClick={handleSensorClick}
