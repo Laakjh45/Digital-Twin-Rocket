@@ -24,7 +24,7 @@ export type TwinDefinition = {
 //ALL DIGITAL TWINS REGISTER HERE
 export const twins: TwinDefinition[] = [
   {
-    id: "pslv_1",
+    id: "rocket_1",
     name: "PSLV Twin",
     description: "Propulsion • Thermal • Structural telemetry",
     measurement: "rocket_sensors",
@@ -46,7 +46,7 @@ export const twins: TwinDefinition[] = [
   // FUTURE MODELS
 
   {
-    id: "gslv_1",
+    id: "rocket_2",
     name: "GSLV Twin",
     description: "Cryogenic propulsion monitoring",
     measurement: "gslv_sensors",

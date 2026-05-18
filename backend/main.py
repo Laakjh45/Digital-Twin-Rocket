@@ -9,6 +9,7 @@ import json
 import threading
 from redis_client import r, get_alert_channel, get_notification_channel
 from config import (INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG, INFLUXDB_BUCKET)
+from twins.registry import get_twin_config, twin_exists, get_measurement, get_metric_config
 
 client = InfluxDBClient(
     url=INFLUXDB_URL,
@@ -17,9 +18,8 @@ client = InfluxDBClient(
 )
 
 bucket = INFLUXDB_BUCKET
-MEASUREMENT = "rocket_sensors"
 
-# ===== APP INIT =====
+# APP INIT 
 app = FastAPI()
 
 app.add_middleware(
@@ -32,7 +32,7 @@ app.add_middleware(
 
 query_api: QueryApi = client.query_api()
 
-# ===== ROUTES =====
+# ROUTES
 
 @app.get("/")
 def root():
@@ -40,10 +40,12 @@ def root():
 
 @app.get("/twins/{twin_id}/sensors")
 def get_sensors(twin_id: str):
+    config = get_twin_config(twin_id)
+    measurement = config["measurement"]
     query = f'''
     from(bucket: "{bucket}")
         |> range(start: -30d)
-        |> filter(fn: (r) => r._measurement == "{MEASUREMENT}")
+        |> filter(fn: (r) => r._measurement == "{measurement}")
         |> filter(fn: (r) => r.twin_id == "{twin_id}")
         |> keep(columns: ["sensor_id"])
         |> distinct(column: "sensor_id")
@@ -57,10 +59,12 @@ def get_sensors(twin_id: str):
 
 @app.get("/twins/{twin_id}/sensor/{sensor_id}/history")
 def get_history(twin_id: str, sensor_id: str, minutes: int = 10):
+    config = get_twin_config(twin_id)
+    measurement = config["measurement"]
     query = f'''
     from(bucket: "{bucket}")
         |> range(start: -{minutes}m)
-        |> filter(fn: (r) => r._measurement == "{MEASUREMENT}")
+        |> filter(fn: (r) => r._measurement == "{measurement}")
         |> filter(fn: (r) => r.twin_id == "{twin_id}")
         |> filter(fn: (r) => r.sensor_id == "{sensor_id}")
         |> sort(columns: ["_time"])
@@ -81,10 +85,12 @@ def get_history(twin_id: str, sensor_id: str, minutes: int = 10):
 
 @app.get("/twins/{twin_id}/sensor/{sensor_id}/latest")
 def get_latest(twin_id: str, sensor_id: str):
+    config = get_twin_config(twin_id)
+    measurement = config["measurement"]
     query = f'''
     from(bucket: "{bucket}")
         |> range(start: -5m)
-        |> filter(fn: (r) => r._measurement == "{MEASUREMENT}")
+        |> filter(fn: (r) => r._measurement == "{measurement}")
         |> filter(fn: (r) => r.twin_id == "{twin_id}")
         |> filter(fn: (r) => r.sensor_id == "{sensor_id}")
         |> last()
@@ -104,10 +110,12 @@ def get_latest(twin_id: str, sensor_id: str):
 
 @app.get("/twins/{twin_id}/sensors/latest-all")
 def get_all_latest(twin_id: str):
+    config = get_twin_config(twin_id)
+    measurement = config["measurement"]
     query = f'''
     from(bucket: "{bucket}")
         |> range(start: -1m)
-        |> filter(fn: (r) => r._measurement == "{MEASUREMENT}")
+        |> filter(fn: (r) => r._measurement == "{measurement}")
         |> filter(fn: (r) => r.twin_id == "{twin_id}")
         |> group(columns: ["sensor_id", "_field"])
         |> last()
@@ -158,6 +166,8 @@ def redis_listener(ws, twin_id, loop):
 
 @app.websocket("/ws/{twin_id}")
 async def websocket_live(ws: WebSocket, twin_id: str):
+    config = get_twin_config(twin_id)
+    measurement = config["measurement"]
     await ws.accept()
     loop = asyncio.get_running_loop()
     threading.Thread(
@@ -180,16 +190,14 @@ async def websocket_live(ws: WebSocket, twin_id: str):
                 query = f'''
                 from(bucket: "{bucket}")
                     |> range(start: -5s)
-                    |> filter(fn: (r) => r._measurement == "{MEASUREMENT}")
+                    |> filter(fn: (r) => r._measurement == "{measurement}")
                     |> filter(fn: (r) => r.twin_id == "{twin_id}")
                     |> group(columns: ["sensor_id", "_field"])
                     |> last()
                 '''
 
                 tables = query_api.query(query)
-
                 result = {}
-
                 for table in tables:
                     for record in table.records:
                         sensor = record["sensor_id"]
@@ -235,7 +243,6 @@ def get_events(twin_id: str, minutes: int = 60):
     '''
 
     tables = query_api.query(query)
-
     events = []
 
     for table in tables:
