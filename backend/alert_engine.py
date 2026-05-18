@@ -1,8 +1,10 @@
+import math
 import time
 from redis_client import publish_alert, publish_notification
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 from config import (INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG, INFLUXDB_BUCKET)
+from twins.registry import get_twin_config, get_metric_config
 
 client = InfluxDBClient(
     url=INFLUXDB_URL,
@@ -18,10 +20,6 @@ write_api = client.write_api(write_options=SYNCHRONOUS)
 alert_state = {}
 last_seen = {}
 
-# Thresholds (we will later move to config)
-TEMP_THRESHOLD = 85
-STALE_TIMEOUT = 5  # seconds
-
 def store_event(twin_id, event):
     point = (
         Point("events")
@@ -36,11 +34,54 @@ def store_event(twin_id, event):
 
     write_api.write(bucket=bucket, org=org, record=point)
 
+# METRIC CLASSIFICATION ENGINE
+
+def is_offline(value, offline_rules):
+    if value is None:
+        return True
+    if isinstance(value, (int, float)):
+        if math.isnan(value):
+            return True
+    if "greater_than" in offline_rules:
+        if value > offline_rules["greater_than"]:
+            return True
+    if "equals" in offline_rules:
+        if value == offline_rules["equals"]:
+            return True
+    return False
+
+def classify_metric(twin_id: str, metric: str, value):
+    metric_config = get_metric_config(twin_id, metric)
+    if not metric_config:
+        return None
+    offline_rules = metric_config.get("offline", {})
+
+    # OFFLINE
+    if is_offline(value, offline_rules):
+        return {
+            "label": "offline",
+            "severity": 5,
+            "color": "#6b7280",
+            "offline": True
+        }
+
+    # RANGE CLASSIFICATION
+    bands = metric_config.get("bands", [])
+    for band in bands:
+        min_v = band["min"]
+        max_v = band["max"]
+        if value >= min_v and value < max_v:
+            return {
+                "label": band["label"],
+                "severity": band["severity"],
+                "color": band["color"],
+                "offline": False
+            }
+    return None
 
 def process_data(twin_id: str, result: dict):
     alerts = []
     notifications = []
-
     now = time.time()
 
     # PROCESS SENSOR DATA
@@ -52,55 +93,87 @@ def process_data(twin_id: str, result: dict):
                 "message": f"{sensor} connected",
                 "time": now
             }
-
             publish_notification(twin_id, notif)
             store_event(twin_id, notif)
             notifications.append(notif)
         last_seen[(twin_id, sensor)] = now
 
-        # Temperature Alert
+        # TEMPERATURE CLASSIFICATION
         if "temperature" in fields:
             temp = fields["temperature"]["value"]
-            key = f"{twin_id}_{sensor}_temp"
+            classification = classify_metric(
+                twin_id,
+                "temperature",
+                temp
+            )
 
-            if temp > TEMP_THRESHOLD:
-                if alert_state.get(key) != "active":
-                    alert_state[key] = "active"
+            if classification:
+                key = f"{twin_id}_{sensor}_temperature"
+                severity = classification["severity"]
+                label = classification["label"]
+                previous = alert_state.get(key)
 
-                    alert = {
-                        "type": "alert",
-                        "severity": "critical",
-                        "sensor": sensor,
-                        "message": f"{sensor} high temperature: {temp:.2f}°C",
-                        "status": "active",
-                        "time": now
-                    }
+                # OFFLINE
+                if classification["offline"]:
+                    if previous != "offline":
+                        alert_state[key] = "offline"
+                        notif = {
+                            "type": "notification",
+                            "severity": "offline",
+                            "sensor": sensor,
+                            "metric": "temperature",
+                            "message": f"{sensor} temperature sensor offline",
+                            "status": "offline",
+                            "state": classification,
+                            "time": now
+                        }
+                        publish_notification(twin_id, notif)
+                        store_event(twin_id, notif)
+                        notifications.append(notif)
 
-                    publish_alert(twin_id, alert)
-                    store_event(twin_id, alert)
-                    alerts.append(alert)
+                # WARNING / CRITICAL
+                elif severity >= 3:
+                    if previous != label:
+                        alert_state[key] = label
+                        alert = {
+                            "type": "alert",
+                            "severity": label,
+                            "sensor": sensor,
+                            "metric": "temperature",
+                            "message": f"{sensor} temperature {label}: {temp:.2f}",
+                            "status": "active",
+                            "state": classification,
+                            "value": temp,
+                            "time": now
+                        }
 
-            else:
-                if alert_state.get(key) == "active":
-                    alert_state[key] = "resolved"
+                        publish_alert(twin_id, alert)
+                        store_event(twin_id, alert)
+                        alerts.append(alert)
 
-                    notif = {
-                        "type": "notification",
-                        "sensor": sensor,
-                        "message": f"{sensor} temperature back to normal",
-                        "status": "resolved",
-                        "time": now
-                    }
-
-                    publish_notification(twin_id, notif)
-                    store_event(twin_id, notif)
-                    notifications.append(notif)
+                # NORMALIZED
+                else:
+                    if previous and previous not in ["healthy", "optimal"]:
+                        alert_state[key] = label
+                        notif = {
+                            "type": "notification",
+                            "severity": label,
+                            "sensor": sensor,
+                            "metric": "temperature",
+                            "message": f"{sensor} temperature normalized",
+                            "status": "resolved",
+                            "state": classification,
+                            "value": temp,
+                            "time": now
+                        }
+                        publish_notification(twin_id, notif)
+                        store_event(twin_id, notif)
+                        notifications.append(notif)
 
         # Pressure Alert
         if "pressure" in fields:
             p = fields["pressure"]["value"]
             key = f"{twin_id}_{sensor}_pressure"
-
             if p < 10:
                 if alert_state.get(key) != "active":
                     alert_state[key] = "active"
@@ -113,7 +186,6 @@ def process_data(twin_id: str, result: dict):
                         "status": "active",
                         "time": now
                     }
-
                     publish_alert(twin_id, alert)
                     store_event(twin_id, alert)
                     alerts.append(alert)
@@ -129,7 +201,6 @@ def process_data(twin_id: str, result: dict):
                         "status": "resolved",
                         "time": now
                     }
-
                     publish_notification(twin_id, notif)
                     store_event(twin_id, notif)
                     notifications.append(notif)
@@ -158,7 +229,6 @@ def process_data(twin_id: str, result: dict):
             else:
                 if alert_state.get(key) == "active":
                     alert_state[key] = "resolved"
-
                     notif = {
                         "type": "notification",
                         "sensor": sensor,
@@ -166,7 +236,6 @@ def process_data(twin_id: str, result: dict):
                         "status": "resolved",
                         "time": now
                     }
-
                     publish_notification(twin_id, notif)
                     store_event(twin_id, notif) 
                     notifications.append(notif) 
@@ -174,11 +243,9 @@ def process_data(twin_id: str, result: dict):
         if "voltage" in fields:
             v = fields["voltage"]["value"]
             key = f"{twin_id}_{sensor}_voltage"
-
             if v < 20 or v > 30:
                 if alert_state.get(key) != "active":
                     alert_state[key] = "active"
-
                     alert = {
                         "type": "alert",
                         "severity": "warning",
@@ -187,7 +254,6 @@ def process_data(twin_id: str, result: dict):
                         "status": "active",
                         "time": now
                     }
-
                     publish_alert(twin_id, alert)
                     store_event(twin_id, alert)
                     alerts.append(alert)
@@ -195,7 +261,6 @@ def process_data(twin_id: str, result: dict):
             else:
                 if alert_state.get(key) == "active":
                     alert_state[key] = "resolved"
-
                     notif = {
                         "type": "notification",
                         "sensor": sensor,
@@ -203,7 +268,6 @@ def process_data(twin_id: str, result: dict):
                         "status": "resolved",
                         "time": now
                     }
-
                     publish_notification(twin_id, notif)
                     store_event(twin_id, notif)
                     notifications.append(notif)
@@ -429,25 +493,3 @@ def process_data(twin_id: str, result: dict):
                     publish_notification(twin_id, notif)
                     store_event(twin_id, notif)
                     notifications.append(notif)
-
-    # 🔌 Sensor Disconnect Detection
-    for (t_id, sensor), last in list(last_seen.items()):
-        if t_id != twin_id:
-            continue
-
-        if now - last > STALE_TIMEOUT:
-            notif = {
-                "type": "notification",
-                "sensor": sensor,
-                "message": f"{sensor} disconnected",
-                "status": "inactive",
-                "time": now
-            }
-
-            publish_notification(twin_id, notif)
-            store_event(twin_id, notif)
-            notifications.append(notif)
-
-            del last_seen[(t_id, sensor)]
-
-    return alerts, notifications
