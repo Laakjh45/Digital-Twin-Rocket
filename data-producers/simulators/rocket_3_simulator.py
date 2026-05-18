@@ -5,6 +5,8 @@ import random
 import time
 from config import (INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG, INFLUXDB_BUCKET)
 
+TWIN_ID = "rocket_3"
+
 client = InfluxDBClient(
     url=INFLUXDB_URL,
     token=INFLUXDB_TOKEN,
@@ -108,7 +110,11 @@ print("🚀 Rocket Simulator Started...\n")
 
 while True:
     for sensor_id, metrics in SENSORS.items():
-        point = Point("rocket_sensors").tag("sensor_id", sensor_id)
+        point = (
+            Point("rocket_sensors")
+            .tag("twin_id", TWIN_ID)
+            .tag("sensor_id", sensor_id)
+        )
 
         for metric in metrics:
             value = generate_value(metric)
